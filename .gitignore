@@ -1,0 +1,27 @@
+# Dependencias y builds de Colcon / ROS2
+build/
+install/
+log/
+.colcon/
+.colcon_ignore
+
+# Archivos de entorno o locales
+.env
+.envrc
+*.pyc
+__pycache__/
+
+# Directorios de simulación / Gazebo (si aparecen en el proyecto)
+.gz/
+.ignition/
+*.gz  # si hay archivos comprimidos sueltos
+
+# Archivos de IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

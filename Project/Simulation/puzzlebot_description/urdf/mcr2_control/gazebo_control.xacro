@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:macro name="puzzlebot_control" params="prefix">
+    <gazebo>
+        <plugin name="gazebo_ros_diff_drive" filename="libgazebo_ros_diff_drive.so">
+            <update_rate>50</update_rate>
+            <left_joint>${prefix}wheel_left_joint</left_joint>
+            <right_joint>${prefix}wheel_right_joint</right_joint>
+            <wheel_separation>0.19</wheel_separation>
+            <wheel_diameter>0.10</wheel_diameter>
+            <max_wheel_torque>20</max_wheel_torque>
+            <max_wheel_acceleration>1.0</max_wheel_acceleration>
+            <command_topic>cmd_vel</command_topic>
+            <odometry_topic>odom</odometry_topic>
+            <odometry_frame>odom</odometry_frame>
+            <robot_base_frame>${prefix}base_footprint</robot_base_frame>
+            <publish_odom>true</publish_odom>
+            <publish_odom_tf>true</publish_odom_tf>
+            <publish_wheel_tf>false</publish_wheel_tf>
+        </plugin>
+
+        <plugin name="gazebo_ros_joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
+            <update_rate>50</update_rate>
+            <joint_name>${prefix}wheel_right_joint</joint_name>
+            <joint_name>${prefix}wheel_left_joint</joint_name>
+        </plugin>
+    </gazebo>
+</xacro:macro>
+
+</robot>

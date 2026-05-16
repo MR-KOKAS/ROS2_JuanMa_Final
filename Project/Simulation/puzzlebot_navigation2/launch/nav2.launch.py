@@ -24,9 +24,9 @@ def launch_setup(context, *args, **kwargs):
 
     return [
         DeclareLaunchArgument('map', default_value=map_dir,
-            description='Full path to map file to load'),
+            description='map file to load'),
         DeclareLaunchArgument('params_file', default_value=param_dir,
-            description='Full path to param file to load'),
+            description='param file to load'),
         DeclareLaunchArgument('use_sim_time', default_value='true',
             description='Use simulation (Gazebo) clock if true'),
         IncludeLaunchDescription(

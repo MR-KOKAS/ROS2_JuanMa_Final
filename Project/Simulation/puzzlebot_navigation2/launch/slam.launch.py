@@ -1,86 +1,82 @@
-# Importaciones necesarias para definir y ejecutar archivos de lanzamiento (launch) en ROS 2
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Starts SLAM Toolbox in online‑async mapping mode together with Gazebo and RViz.
+
+Launch order:
+  1. Gazebo + PuzzleBot          (from puzzlebot_gazebo)
+  2. SLAM Toolbox                (async_slam_toolbox_node with slam_toolbox.yaml)
+  3. RViz2                       (pre‑configured display)
+
+Usage:
+    ros2 launch puzzlebot_navigation2 slam.launch.py
+    ros2 launch puzzlebot_navigation2 slam.launch.py use_sim_time:=true
+"""
+
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from ament_index_python.packages import get_package_share_directory
-import os
+from launch_ros.actions import Node
 
-# Función que configura los nodos y lanzamientos incluidos
-def launch_setup(context, *args, **kwargs):
-    # Obtiene el valor del argumento 'map_name' (nombre del mapa) desde el archivo de lanzamiento
-    map_name = LaunchConfiguration('map_name').perform(context)
-    
-    # Obtiene el path del paquete principal que contiene configuraciones de navegación
-    base_path = get_package_share_directory('puzzlebot_navigation2')
-    
-    # Ruta del archivo de configuración de RViz para visualizar el mapeo
-    rviz_file = os.path.join(base_path, 'rviz', "slam.rviz")
-    
-    # Obtiene las rutas de los paquetes nav2_bringup y slam_toolbox
-    nav2_bringup_dir = get_package_share_directory('nav2_bringup')
-    slam_toolbox_dir = get_package_share_directory('slam_toolbox')
 
-    # Diccionario con argumentos comunes, como si se usa el tiempo simulado
-    args = {
-        'use_sim_time': LaunchConfiguration('use_sim_time')
-    }
+def generate_launch_description() -> LaunchDescription:
+    """Generate and return the launch description for SLAM mapping."""
 
-    # Si el mapa se llama 'puzzlebot', se agrega la configuración de SLAM
-    if map_name.lower() == 'puzzlebot':
-        args['slam_params_file'] = LaunchConfiguration('slam_params_file')
+    # Package directories
+    nav2_pkg = get_package_share_directory('puzzlebot_navigation2')
+    gazebo_pkg = get_package_share_directory('puzzlebot_gazebo')
 
-    # Devuelve una lista de acciones que se lanzarán
-    return [
-        # Declaración del argumento 'use_sim_time' con valor por defecto 'true'
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='true',
-            description='Use simulation time'
+    # File paths
+    slam_config_file = os.path.join(nav2_pkg, 'config', 'slam_toolbox.yaml')
+    rviz_config_file = os.path.join(nav2_pkg, 'rviz', 'slam.rviz')
+
+    # Launch configuration
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+
+    # ========== 1. Launch arguments ==========
+    sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='true',
+        description='Use simulation time (/clock) from Gazebo'
+    )
+
+    # ========== 2. Gazebo simulation with PuzzleBot ==========
+    gazebo_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(gazebo_pkg, 'launch', 'puzzlebot_gazebo.launch.py')
         ),
+        launch_arguments={'use_sim_time': use_sim_time}.items()
+    )
 
-        # Declaración del argumento 'slam_params_file' con un archivo YAML por defecto
-        DeclareLaunchArgument(
-            'slam_params_file',
-            default_value=os.path.join(base_path, 'config', 'slam_toolbox.yaml'),
-            description='Full path to the Slam Toolbox configuration file'
-        ),
+    # ========== 3. SLAM Toolbox (online asynchronous mapping) ==========
+    slam_node = Node(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
+        output='screen',
+        parameters=[
+            slam_config_file,
+            {'use_sim_time': use_sim_time}
+        ],
+    )
 
-        # Inclusión del lanzamiento principal de navegación de Nav2
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(nav2_bringup_dir, 'launch', 'navigation_launch.py')
-            ),
-            launch_arguments={'use_sim_time': LaunchConfiguration('use_sim_time')}.items()
-        ),
+    # ========== 4. RViz2 visualization ==========
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config_file],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen'
+    )
 
-        # Inclusión del lanzamiento del SLAM Toolbox en modo 'online_async'
-        # Este modo realiza mapeo en tiempo real con optimización asíncrona (ideal para SBCs)
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')
-            ),
-            launch_arguments=args.items()
-        ),
-
-        # Nodo de RViz para visualizar el proceso de SLAM
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            output='screen',
-            arguments=['-d', rviz_file],
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
-        ),
-    ]
-
-# Función principal que genera la descripción del lanzamiento
-def generate_launch_description():
     return LaunchDescription([
-        # Se declaran argumentos iniciales del archivo de lanzamiento
-        DeclareLaunchArgument('use_sim_time', default_value='true'),
-        DeclareLaunchArgument('map_name', default_value='hexagonal'),
-        # Se utiliza OpaqueFunction para ejecutar dinámicamente la función 'launch_setup'
-        OpaqueFunction(function=launch_setup)
+        sim_time_arg,
+        gazebo_launch,
+        slam_node,
+        rviz_node,
     ])

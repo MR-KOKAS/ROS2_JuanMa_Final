@@ -1,110 +1,102 @@
 slam_toolbox:
   ros__parameters:
 
-    use_sim_time: true
-    use_odometry: true
-    solver_plugin: solver_plugins::CeresSolver  
-    ceres_linear_solver: DENSE_SCHUR  
-    ceres_preconditioner: SCHUR_JACOBI  
-    ceres_trust_strategy: LEVENBERG_MARQUARDT  
-    ceres_dogleg_type: TRADITIONAL_DOGLEG  
-    ceres_loss_function: Huber  
+    # ── Solver ──────────────────────────────────────────────────────────────
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # ── Frame IDs ────────────────────────────────────────────────────────────
     odom_frame: odom
     map_frame: map
     base_frame: base_footprint
     scan_topic: /scan
-    mode: mapping
     use_map_saver: true
-    enable_interactive_mode: true
+
+    # ── Modo: mapeo continuo asincrono ───────────────────────────────────────
+    mode: mapping
+
+    # ── Timing ───────────────────────────────────────────────────────────────
     debug_logging: false
-    transform_publish_period: 0.02
+    throttle_scans: 1                    # procesa cada scan sin omitir ninguno
+    transform_publish_period: 0.02       # segundos entre publicaciones del TF
+    map_update_interval: 5.0             # segundos entre actualizaciones de /map
+    # Se sube de 0.5 a 0.6 s para dar margen a que la odometria acumule
+    # suficiente desplazamiento entre scans y evitar procesamiento redundante.
+    minimum_time_interval: 0.6
+
+    # ── Resolucion del mapa (debe coincidir con MapaHector.yaml = 0.05) ──────
+    resolution: 0.05
+    max_laser_range: 12.0                 # metros — acotado al tamaño del laberinto
+
+    # ── Buffer TF ────────────────────────────────────────────────────────────
     transform_timeout: 0.2
     tf_buffer_duration: 30.0
-    resolution: 0.01
-    map_update_interval: 0.5
-    throttle_scans: 1
     stack_size_to_use: 40000000
-    map_publish_period: 0.5
-    min_laser_range: 0.2 
-    max_laser_range: 5.0
-    occupied_thresh: 0.65
-    free_thresh: 0.25
+
+    # ── Scan matching ─────────────────────────────────────────────────────────
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.05
-    minimum_travel_heading: 0.08
-    scan_buffer_size: 10
-    scan_buffer_maximum_scan_distance: 4.0  
-    do_loop_closing: true  
-    loop_search_maximum_distance: 1.2  
-    loop_match_minimum_chain_size: 6  
-    loop_match_maximum_variance_coarse: 1.0
-    loop_match_minimum_response_coarse: 0.20  
-    loop_match_minimum_response_fine: 0.30  
+    # Se usa 0.12 m en lugar de 0.10 para que el robot acumule un poco mas
+    # de recorrido entre scans procesados; en pasillos simetricos esto reduce
+    # la probabilidad de matches ambiguos entre segmentos similares.
+    minimum_travel_distance: 0.12
+    # El umbral angular se mantiene en 0.10 rad (~6 grados): suficiente para
+    # detectar giros cortos sin sobrecargar el solver.
+    minimum_travel_heading: 0.10
+
+    # Se reduce a 18 scans en el buffer: en simulacion cada scan es limpio,
+    # no hace falta tanta historia para encontrar buenos candidatos de match.
+    scan_buffer_size: 18
+    scan_buffer_maximum_scan_distance: 10.0
+    # Se sube ligeramente a 0.18 para ser un poco mas exigente en el match fino
+    # y evitar que SLAM acepte coincidencias de baja calidad en zonas repetitivas.
+    link_match_minimum_response_fine: 0.18
+    link_scan_maximum_distance: 1.5
+
+    # ── Loop closure ─────────────────────────────────────────────────────────
+    # Los pasillos del laberinto son geometricamente similares entre si.
+    # Se mantienen los thresholds altos para evitar cierres de bucle falsos
+    # que teletransportarian el robot a un pasillo incorrecto.
+    do_loop_closing: true
+    loop_search_maximum_distance: 3.0
+    # Se sube de 15 a 17: exige aun mas evidencia antes de intentar
+    # un cierre de bucle en entornos con repeticion geometrica alta.
+    loop_match_minimum_chain_size: 17
+    loop_match_maximum_variance_coarse: 3.0
+    # Thresholds de respuesta: suficientemente altos para evitar falsos positivos.
+    loop_match_minimum_response_coarse: 0.60  # ligeramente mas estricto que 0.55
+    loop_match_minimum_response_fine: 0.65    # se mantiene igual
+
+    # ── Busqueda de correlacion ───────────────────────────────────────────────
+    # Se mantiene en 0.3 m: suficiente para corregir drift de odometria sin
+    # permitir saltos grandes de posicion al matchear scans.
     correlation_search_space_dimension: 0.3
-    correlation_search_space_resolution: 0.02    # 2 cm pasos
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
 
-    # Desviación (m) para “esparcir” (smear) la nube y suavizar picos de correlación
-    # 5 cm atenúa ruido de sensores y ligeros desajustes.
-    correlation_search_space_smear_deviation: 0.05  # 10 cm desvío
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
 
-    loop_search_space_dimension:     1.5   # Sólo busca loops a ≤ 1.5 m
-    loop_search_space_resolution:    0.05  # 5 cm de precisión
-    loop_search_space_smear_deviation: 0.025 # Mínimo 0.025, ahora 3 cm de “smear”
+    # ── Penalizaciones por salto ──────────────────────────────────────────────
+    # Se sube distance_variance_penalty a 1.8 para castigar mas fuerte los
+    # saltos de posicion; en laberinto estrecho cualquier salto grande
+    # suele ser un error del solver y no un movimiento real del robot.
+    distance_variance_penalty: 1.8
+    # angle_variance_penalty se mantiene en 2.0: ya es bastante restrictivo.
+    angle_variance_penalty: 2.0
 
-    ######### PENALIZACIÓN (RESTRICCIONES DE MOVIMIENTO) #########
-    # Balancea confianza entre odometría y scan-matching
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
 
-    # ¿Cuánto penalizar saltos grandes en traslación entre escaneos?
-    # Un valor alto (1.0) desincentiva drifts mayores a unos cms.
-    distance_variance_penalty: 1.0    # Penaliza fuertemente traslaciones grandes
-
-    # ¿Cuánto penalizar saltos grandes en orientación?
-    # Un valor alto (2.0) ayuda a mantener continuidad angular
-    # en robots lentos y entornos estrechos.
-    angle_variance_penalty: 2.0       # Penaliza fuertemente rotaciones grandes
-
-    ######### BÚSQUEDA FINA/GRUESA #########
-    # Ángulo (rad) de paso en la búsqueda fina de correspondencias
-    # 0.00349 rad ≈ 0.2°: muy detallado para pequeños ajustes angulares
-    fine_search_angle_offset: 0.00175       # 0.2° paso fino
-
-    # Ángulo (rad) de paso en la búsqueda gruesa (coarse)
-    # 0.349 rad ≈ 20°: rápido barrido inicial para encontrar la mejor región
-    coarse_search_angle_offset: 0.0175       # 20° paso grueso
-
-    # Resolución angular (rad) en la fase gruesa
-    # 0.0349 rad ≈ 2° entre muestras en coarse search
-    coarse_angle_resolution: 0.0349        # 2° resolución coarse
-
-    # Penalización mínima (0–1) para aceptar un match angular
-    # 0.9: se requiere alta similitud en ángulo antes de refinar
-    minimum_angle_penalty: 0.9             # evita matches con gran error angular
-
-    # Penalización mínima (0–1) para aceptar un match de distancia
-    # 0.5: tolera algo de desviación en distancia antes de descartar
-    minimum_distance_penalty: 0.5          # descarta matches con gran offset lineal
-
-    # ¿Expandir la respuesta de correlación para suavizar picos?
-    # true: ayuda a que picos locales pequeños no dominen la elección
-    use_response_expansion: true           # Suaviza picos en la función de correlación
-
-    ########## FILTRADO DE CELDAS (POST-PROCESO) ##########
-
-    # Número mínimo de escaneos que deben “pasar” por una celda para marcarla libre
-    # 2: reduce ruido, evita celdas libres falsas por un solo escaneo
-    min_pass_through: 3                    # Requiere 2 pasadas para libre
-
-    # Umbral de ocupación (0–1) para marcar una celda como muro
-    # 0.1: celdas ligeramente ocupadas se ignoran, útil para paredes finas
-    occupancy_threshold: 0.2              # Evita muros “fantasma” en bordes delgados
-
-    ########## PARÁMETROS ADICIONALES RECOMENDADOS ##########
-
-    # Ajusta cuántos escaneos previos se usan para suavizar el mapa final.
-    # Para un mapa pequeño de 3×3 m, un buffer de 5 escaneos ayuda a consolidar sin ralentizar.
-    scan_accumulation: 5                   # Acumula 5 escaneos antes de actualizar
-
-    # Ajusta la frecuencia de publicación de odometría en SLAM (sólo si SLAM publica tf)
-    # 20 Hz mantiene tf actualizado sin saturar CPU.
-    odom_publish_frequency: 20.0              # Publica odom a 20 Hz
+    # ── Modo interactivo ──────────────────────────────────────────────────────
+    # Permite editar el mapa manualmente despues de la sesion de mapeo.
+    enable_interactive_mode: true

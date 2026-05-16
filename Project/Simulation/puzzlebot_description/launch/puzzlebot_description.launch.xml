@@ -1,10 +1,11 @@
 <launch>
-    <arg name="rviz" default="true"/>
+    <arg name="rviz" default="false"/>
     <arg name="gazebo" default="false"/>
     <arg name="joint_gui" default="false"/>
     <arg name="use_sim_time" default="false"/>
 
-    <let name="urdf_path" value="$(find-pkg-share puzzlebot_description)/urdf/mcr2_robots/puzzlebot_jetson_lidar_ed.xacro"/>
+    <!-- <let name="urdf_path" value="$(find-pkg-share puzzlebot_description)/urdf/mcr2_robots/puzzlebot_jetson_lidar_ed.xacro"/> -->
+    <let name="urdf_path" value="$(find-pkg-share puzzlebot_description)/urdf/puzzlebot.urdf.xacro"/> 
     <let name="rviz_config_path" value="$(find-pkg-share puzzlebot_description)/rviz/puzzlebot_description.rviz"/>
     <let name="gazebo_path" value="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py"/>
 
@@ -12,6 +13,10 @@
         <param name="robot_description" value="$(command 'xacro $(var urdf_path)')"/>
         <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
+    
+    <!-- Publicador de TF estático de map a odom -->
+    <node pkg="tf2_ros" exec="static_transform_publisher" name="map_to_odom_broadcaster"
+      args="0 0 0 0 0 0 map odom" />
 
     <node pkg="rviz2" exec="rviz2" output="screen" if="$(var rviz)" args="-d $(var rviz_config_path)">
         <param name="use_sim_time" value="$(var use_sim_time)"/>

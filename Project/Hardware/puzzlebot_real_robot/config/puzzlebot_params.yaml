@@ -1,0 +1,14 @@
+puzzlebot_localization_node:
+  ros__parameters: 
+    wheel_radius: 0.05
+    wheel_base: 0.19
+    localization_update_rate: 25.0
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      theta: 0.0
+
+puzzlebot_joint_state_publisher_node:
+  ros__parameters:
+    wheel_radius: 0.05
+    wheel_base: 0.19

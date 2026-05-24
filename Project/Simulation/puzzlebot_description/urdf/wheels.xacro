@@ -6,7 +6,7 @@
       <visual>
         <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <geometry>
-          <mesh filename="package://puzzlebot_description/meshes/wheels/Puzzlebot_Wheel.stl" scale="${mesh_scale} ${mesh_scale} ${mesh_scale}"/>
+          <mesh filename="package://puzzlebot_description/meshes/Puzzlebot_Wheel.stl" scale="${mesh_scale} ${mesh_scale} ${mesh_scale}"/>
         </geometry>
         <material name="dark_grey">
           <color rgba="0.3 0.3 0.3 1.0"/>
@@ -37,7 +37,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://puzzlebot_description/meshes/wheels/Puzzlebot_Caster_Wheel.stl" scale="${mesh_scale} ${mesh_scale} ${mesh_scale}"/>
+        <mesh filename="package://puzzlebot_description/meshes/Puzzlebot_Caster_Wheel.stl" scale="${mesh_scale} ${mesh_scale} ${mesh_scale}"/>
       </geometry>
       <material name="grey">
         <color rgba="0.4 0.4 0.4 1.0"/>

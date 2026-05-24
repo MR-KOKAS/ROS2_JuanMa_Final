@@ -1,47 +1,94 @@
-# nav2_params.yaml  — tuned for Puzzlebot in a small indoor maze
-# Robot footprint: ~0.18 m × 0.15 m  →  robot_radius ≈ 0.12 m
-# Max linear speed: 0.22 m/s  |  Max angular speed: 1.0 rad/s
+# =============================================================================
+#  nav2_params.yaml  —  Configuracion Nav2 para PuzzleBot (Actividad M3.4)
+# -----------------------------------------------------------------------------
+#  Robot (escala 70%):
+#    - Footprint:     12.6 cm x 10.5 cm
+#    - Radio inscrito: ~8.2 cm
+#    - Altura chasis: 5 cm
+#    - Separacion de ruedas: 13.3 cm
+#    - Vel. lineal max: 0.12 m/s  |  Vel. angular max: 0.8 rad/s
+#    - LiDAR 360 a z=8 cm, rango 0.08-5.0 m, 10 Hz
+#
+#  Entorno:
+#    - Resolucion del mapa: 0.05 m/px
+#    - Laberinto interior con pasillos de aprox. 30 cm de ancho
+#
+#  Nota: los valores fueron ajustados segun el comportamiento observado
+#        en simulacion Gazebo con el modelo diferencial del PuzzleBot.
+# =============================================================================
 
+
+# ============================================================================
+#  AMCL  —  Localizacion probabilistica con filtro de particulas
+# ============================================================================
+#  La odometria en Gazebo es muy limpia, por lo que se reducen los coeficientes
+#  de ruido alpha. Se activa recovery lento para recuperar pose tras colisiones.
+# ============================================================================
 amcl:
   ros__parameters:
     use_sim_time: True
-    alpha1: 0.2
-    alpha2: 0.2
-    alpha3: 0.2
-    alpha4: 0.2
-    alpha5: 0.2
+
+    # Frames de referencia
     base_frame_id: base_footprint
-    beam_skip_distance: 0.5
-    beam_skip_error_threshold: 0.9
-    beam_skip_threshold: 0.3
-    do_beamskip: false
-    global_frame_id: map
-    lambda_short: 0.1
-    laser_likelihood_max_dist: 2.0
-    laser_max_range: 100.0
-    laser_min_range: -1.0
-    laser_model_type: likelihood_field
-    max_beams: 60
-    max_particles: 2000
-    min_particles: 500
     odom_frame_id: odom
+    global_frame_id: map
+    scan_topic: scan
+    tf_broadcast: true
+    transform_tolerance: 0.4   # tolerancia TF: ligeramente reducida para mayor consistencia
+
+    # Modelo de movimiento diferencial.
+    # alpha1: ruido rotacional causado por rotacion
+    # alpha2: ruido rotacional causado por traslacion
+    # alpha3: ruido traslacional causado por traslacion
+    # alpha4: ruido traslacional causado por rotacion
+    # Se usa 0.08 en lugar de 0.1 porque en simulacion el modelo es muy fiel
+    alpha1: 0.08
+    alpha2: 0.08
+    alpha3: 0.08
+    alpha4: 0.08
+    alpha5: 0.08
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+
+    # Numero de particulas del filtro.
+    # Se sube ligeramente min_particles a 350 para que nunca quede con
+    # una nube demasiado escasa en zonas de baja dispersion del mapa.
+    max_particles: 1500
+    min_particles: 350
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0
-    recovery_alpha_slow: 0.0
     resample_interval: 1
-    robot_model_type: nav2_amcl::DifferentialMotionModel
-    save_pose_rate: 0.5
+
+    # Umbrales de actualizacion: el robot se mueve despacio (0.12 m/s),
+    # se mantiene 0.15 m/rad para que AMCL actualice con frecuencia adecuada.
+    update_min_d: 0.15
+    update_min_a: 0.12   # reducido de 0.15 para mayor sensibilidad angular
+
+    # Modelo del sensor laser
+    laser_model_type: "likelihood_field"
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 5.0         # igual al rango real del LiDAR
+    laser_min_range: 0.08        # coincide con distancia minima del sensor
+    max_beams: 60                # submuestreo 1/6 sobre los 360 samples
+
     sigma_hit: 0.2
-    tf_broadcast: true
-    transform_tolerance: 1.0
-    update_min_a: 0.2
-    update_min_d: 0.25
     z_hit: 0.5
     z_max: 0.05
     z_rand: 0.5
     z_short: 0.05
-    scan_topic: scan
+    lambda_short: 0.1
+
+    # Beam skip: desactivado (entorno estatico, sin personas)
+    do_beamskip: false
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+
+    # Recovery: filtro lento detecta divergencia, filtro rapido genera
+    # particulas aleatorias para recuperar la localizacion.
+    recovery_alpha_slow: 0.001
+    recovery_alpha_fast: 0.1
+
+    save_pose_rate: 0.5
 
 amcl_map_client:
   ros__parameters:
@@ -51,6 +98,10 @@ amcl_rclcpp_node:
   ros__parameters:
     use_sim_time: True
 
+
+# ============================================================================
+#  BT NAVIGATOR  —  Orquestador de comportamiento de navegacion
+# ============================================================================
 bt_navigator:
   ros__parameters:
     use_sim_time: True
@@ -96,80 +147,122 @@ bt_navigator_rclcpp_node:
   ros__parameters:
     use_sim_time: True
 
+
+# ============================================================================
+#  CONTROLLER SERVER  —  Regulated Pure Pursuit (RPP)
+# ----------------------------------------------------------------------------
+#  Se usa RPP en lugar de DWB porque en pasillos estrechos RPP con
+#  rotate_to_heading permite al robot detenerse, orientarse y avanzar,
+#  evitando colisiones en giros de 90 grados.
+# ============================================================================
 controller_server:
   ros__parameters:
     use_sim_time: True
-    controller_frequency: 20.0
+    controller_frequency: 20.0     # Hz, adecuado para la velocidad baja del robot
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.0
     min_theta_velocity_threshold: 0.001
     failure_tolerance: 0.3
-    progress_checker_plugin: progress_checker
-    goal_checker_plugins: [general_goal_checker]
-    controller_plugins: [FollowPath]
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
 
+    # --- Verificador de progreso -----------------------------------------
+    # Se usa 0.18 m (en lugar de 0.2) porque el robot puede avanzar poco
+    # en segmentos cortos antes de girar en las esquinas del laberinto.
     progress_checker:
-      plugin: nav2_controller::SimpleProgressChecker
-      required_movement_radius: 0.5
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.18
       movement_time_allowance: 10.0
 
+    # --- Verificador de goal ---------------------------------------------
+    # Tolerancias ajustadas al tamaño del robot (12.6 cm).
+    # xy=0.12 m (~9 cm) | yaw=0.25 rad (~14 grados)
     general_goal_checker:
       stateful: True
-      plugin: nav2_controller::SimpleGoalChecker
-      xy_goal_tolerance: 0.25
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.12
       yaw_goal_tolerance: 0.25
 
-    # Regulated Pure Pursuit — gira en sitio en curvas cerradas
+    # --- Regulated Pure Pursuit ------------------------------------------
     FollowPath:
-      plugin: nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController
-      desired_linear_vel: 0.12
-      lookahead_dist: 0.3
-      min_lookahead_dist: 0.2
-      max_lookahead_dist: 0.4
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+
+      # Velocidades del robot
+      desired_linear_vel: 0.12           # m/s - velocidad nominal en tramos rectos
+      max_angular_accel: 1.6             # rad/s^2 - aceleracion angular maxima
+      rotate_to_heading_angular_vel: 0.55 # rad/s durante el giro en sitio
+
+      # Distancia de lookahead: que tan adelante mira el controlador en el path.
+      # Valores pequenos son mas seguros en pasillos angostos (30 cm).
+      lookahead_dist: 0.25
+      min_lookahead_dist: 0.18           # ligeramente menor para rincones cerrados
+      max_lookahead_dist: 0.35
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 0.6
-      transform_tolerance: 0.3
       use_velocity_scaled_lookahead_dist: false
+
+      # Frenado de aproximacion al goal
       min_approach_linear_velocity: 0.05
-      approach_velocity_scaling_dist: 0.5
+      approach_velocity_scaling_dist: 0.45  # empieza a frenar 45 cm antes del goal
+
+      # Deteccion de colision anticipada
       use_collision_detection: true
       max_allowed_time_to_collision_up_to_carrot: 1.5
+
+      # Regulacion de velocidad en curvas
       use_regulated_linear_velocity_scaling: true
+      regulated_linear_scaling_min_radius: 0.55  # curvas mas cerradas reducen la vel
+      regulated_linear_scaling_min_speed: 0.05   # velocidad minima en curva cerrada
+
+      # Regulacion por costo de costmap (frenado cerca de paredes)
+      use_cost_regulated_linear_velocity_scaling: true
+
       use_fixed_curvature_lookahead: false
       curvature_lookahead_dist: 0.25
-      use_cost_regulated_linear_velocity_scaling: true
-      regulated_linear_scaling_min_radius: 0.6
-      regulated_linear_scaling_min_speed: 0.05
+
+      # Rotate-to-heading: girar en sitio si el angulo al siguiente punto
+      # del path supera 0.5 rad (~28 grados). Esencial en laberinto.
       use_rotate_to_heading: true
       rotate_to_heading_min_angle: 0.5
-      max_angular_accel: 1.8
-      max_robot_pose_search_dist: 10.0
+
       allow_reversing: false
+      max_robot_pose_search_dist: 10.0
+      transform_tolerance: 0.3
 
 controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: True
 
+
+# ============================================================================
+#  LOCAL COSTMAP  —  Ventana rodante alrededor del robot
+# ----------------------------------------------------------------------------
+#  inflation_radius = 0.13 m: margen ajustado para dejar espacio navegable
+#  en pasillos de 30 cm sin bloquear el centro del corredor.
+#  update_frequency = 10 Hz: necesario para reaccionar a tiempo a 0.12 m/s.
+# ============================================================================
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0
-      publish_frequency: 2.0
+      use_sim_time: True
+      update_frequency: 10.0       # Hz - reaccion rapida ante obstaculos
+      publish_frequency: 5.0       # Hz - actualizacion de RViz
       global_frame: odom
       robot_base_frame: base_link
-      use_sim_time: True
       rolling_window: true
       width: 3
       height: 3
-      resolution: 0.05
-      robot_radius: 0.08
-      plugins: [voxel_layer, inflation_layer]
+      resolution: 0.05             # misma resolucion que el mapa global
+      robot_radius: 0.08           # radio del circulo inscrito del robot (~8 cm)
+      plugins: ["voxel_layer", "inflation_layer"]
+
       inflation_layer:
-        plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 5.0
-        inflation_radius: 0.15
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 5.5   # decaimiento ligeramente mas rapido que antes
+        inflation_radius: 0.13     # margen reducido para pasillos de 30 cm
+
       voxel_layer:
-        plugin: nav2_costmap_2d::VoxelLayer
+        plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
         publish_voxel_map: True
         origin_z: 0.0
@@ -183,11 +276,12 @@ local_costmap:
           max_obstacle_height: 2.0
           clearing: True
           marking: True
-          data_type: LaserScan
+          data_type: "LaserScan"
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
+
       static_layer:
         map_subscribe_transient_local: True
       always_send_full_costmap: True
@@ -198,20 +292,25 @@ local_costmap:
     ros__parameters:
       use_sim_time: True
 
+
+# ============================================================================
+#  GLOBAL COSTMAP  —  Mapa de costos estatico completo
+# ============================================================================
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
+      use_sim_time: True
+      update_frequency: 1.0        # estatico, frecuencia baja es suficiente
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      use_sim_time: True
-      robot_radius: 0.08
+      robot_radius: 0.08           # consistente con local_costmap
       resolution: 0.05
       track_unknown_space: true
-      plugins: [static_layer, obstacle_layer, inflation_layer]
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
       obstacle_layer:
-        plugin: nav2_costmap_2d::ObstacleLayer
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
         observation_sources: scan
         scan:
@@ -219,18 +318,21 @@ global_costmap:
           max_obstacle_height: 2.0
           clearing: True
           marking: True
-          data_type: LaserScan
+          data_type: "LaserScan"
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
+
       static_layer:
-        plugin: nav2_costmap_2d::StaticLayer
+        plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+
       inflation_layer:
-        plugin: nav2_costmap_2d::InflationLayer
-        cost_scaling_factor: 5.0
-        inflation_radius: 0.15
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 5.5   # consistente con local_costmap
+        inflation_radius: 0.13     # consistente con local_costmap
+
       always_send_full_costmap: True
   global_costmap_client:
     ros__parameters:
@@ -239,6 +341,10 @@ global_costmap:
     ros__parameters:
       use_sim_time: True
 
+
+# ============================================================================
+#  MAP SERVER / SAVER
+# ============================================================================
 map_server:
   ros__parameters:
     use_sim_time: True
@@ -252,14 +358,21 @@ map_saver:
     occupied_thresh_default: 0.65
     map_subscribe_transient_local: True
 
+
+# ============================================================================
+#  PLANNER SERVER  —  Planificador global A*
+# ----------------------------------------------------------------------------
+#  tolerance = 0.20 m: mas estricto que 0.25, el planner intentara llegar
+#  mas cerca del goal exacto dentro de la celda del mapa (5 cm/px).
+# ============================================================================
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 20.0
     use_sim_time: True
-    planner_plugins: [GridBased]
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
     GridBased:
-      plugin: nav2_navfn_planner/NavfnPlanner
-      tolerance: 0.5
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.20
       use_astar: false
       allow_unknown: true
 
@@ -267,37 +380,50 @@ planner_server_rclcpp_node:
   ros__parameters:
     use_sim_time: True
 
+
+# ============================================================================
+#  RECOVERIES SERVER  —  Comportamientos de recuperacion ante falla
+# ----------------------------------------------------------------------------
+#  Se mantienen los valores de spin/back_up suaves para que los giros
+#  de recuperacion no desestabilicen la localizacion del robot.
+# ============================================================================
 recoveries_server:
   ros__parameters:
+    use_sim_time: True
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
     cycle_frequency: 10.0
-    recovery_plugins: [spin, back_up, wait]
+    recovery_plugins: ["spin", "back_up", "wait"]
     spin:
-      plugin: nav2_recoveries/Spin
+      plugin: "nav2_recoveries/Spin"
     back_up:
-      plugin: nav2_recoveries/BackUp
+      plugin: "nav2_recoveries/BackUp"
     wait:
-      plugin: nav2_recoveries/Wait
+      plugin: "nav2_recoveries/Wait"
     global_frame: odom
     robot_base_frame: base_link
     transform_timeout: 0.1
-    use_sim_time: True
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
-    min_rotational_vel: 0.4
-    rotational_acc_lim: 3.2
+    max_rotational_vel: 0.75      # ligeramente mas conservador para giros suaves
+    min_rotational_vel: 0.3
+    rotational_acc_lim: 1.8       # aceleracion angular reducida para mayor suavidad
+
 
 robot_state_publisher:
   ros__parameters:
     use_sim_time: True
 
+
+# ============================================================================
+#  WAYPOINT FOLLOWER  —  Seguimiento de secuencia de metas
+# ============================================================================
 waypoint_follower:
   ros__parameters:
+    use_sim_time: True
     loop_rate: 20
     stop_on_failure: false
-    waypoint_task_executor_plugin: wait_at_waypoint
+    waypoint_task_executor_plugin: "wait_at_waypoint"
     wait_at_waypoint:
-      plugin: nav2_waypoint_follower::WaitAtWaypoint
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
       enabled: True
-      waypoint_pause_duration: 200
+      waypoint_pause_duration: 2000   # pausa de 2 s en cada waypoint

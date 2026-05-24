@@ -180,7 +180,7 @@
     <preserveFixedJoint>true</preserveFixedJoint>
     </gazebo>-->
 
-
+<!--Lo comentamos porque ahorita no nos sirve para el robot fisico
     <gazebo reference="${prefix}camera_link"> 
             <sensor type="camera" name="${prefix}camera_sensor">
                 <pose>0 0 0 0 0 0</pose>
@@ -241,6 +241,7 @@
             </ray>
         </sensor>
     </gazebo>
+-->
 
 
     </xacro:macro>

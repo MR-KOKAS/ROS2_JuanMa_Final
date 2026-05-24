@@ -1,10 +1,10 @@
 <launch>
     <let name="world_path" value="$(find-pkg-share puzzlebot_gazebo)/worlds/maze.world"/>
    
-    <arg name="use_sim_time" default="true"/>
-    <arg name="headless" default="false"/>
-    <arg name="x_pose" default="2.0"/>
-    <arg name="y_pose" default="-3.5"/>
+    <arg name="use_sim_time" default="true"/> <!-- true --> 
+    <arg name="headless" default="true"/>
+    <arg name="x_pose" default="1.35"/>
+    <arg name="y_pose" default="0.0"/>
 
     <include file="$(find-pkg-share puzzlebot_description)/launch/puzzlebot_description.launch.xml">
         <arg name="use_sim_time" value="$(var use_sim_time)"/>

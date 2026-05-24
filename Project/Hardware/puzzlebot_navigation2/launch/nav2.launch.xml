@@ -3,8 +3,8 @@
     <let name="nav2_core_launch_path" value="$(find-pkg-share puzzlebot_navigation2)/launch/nav2_core.launch.xml"/>
     <let name="nav2_rviz_config_path" value="$(find-pkg-share puzzlebot_navigation2)/rviz/nav2.rviz"/>
 
-    <arg name="use_sim_time" default="true"/>
-    <arg name="headless" default="true"/>
+    <arg name="use_sim_time" default="false"/><!-- true -->
+    <arg name="headless" default="true"/><!-- true -->
     <arg name="map_path" default="$(find-pkg-share puzzlebot_navigation2)/maps/map_maze.yaml"/>
     <arg name="nav2_params_file" default="$(find-pkg-share puzzlebot_navigation2)/config/nav2_params.yaml"/>
 
